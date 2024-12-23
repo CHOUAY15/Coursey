@@ -31,9 +31,6 @@ public class ParticipantDTO {
     private String address;
     private String userId;
 
-    @Builder.Default
-    private List<EnrollmentDTO> enrollments = new ArrayList<>();
 
-    @Builder.Default
-    private List<CertificationDTO> certifications = new ArrayList<>();
+
 }

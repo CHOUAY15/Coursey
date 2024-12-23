@@ -7,5 +7,5 @@ import java.util.List;
 
 
 public interface CertificationRepository extends JpaRepository<Certification, Integer> {
-    List<Certification> findByParticipantId(Integer participantId);
+//    List<Certification> findByParticipantId(Integer participantId);
 }

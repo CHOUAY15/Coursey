@@ -1,16 +1,18 @@
 package com.ensa.projet.participantservice.service.imple;
 
 import com.ensa.projet.participantservice.dto.*;
-import com.ensa.projet.participantservice.entities.EnrollmentStatus;
+import com.ensa.projet.participantservice.entities.Certification;
+
 import com.ensa.projet.participantservice.entities.Participant;
 import com.ensa.projet.participantservice.repository.*;
 import com.ensa.projet.participantservice.service.interfaces.ParticipantService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
-import java.util.stream.Collectors;
+
 
 @Service
 public class ParticipantServiceImpl implements ParticipantService {
@@ -18,84 +20,48 @@ public class ParticipantServiceImpl implements ParticipantService {
     @Autowired
     private ParticipantRepository participantRepository;
 
-    @Autowired
-    private CertificationRepository certificationRepository;
+
+
 
     @Override
-    public ParticipantDTO createParticipant(String userId, KeycloakUserInfo userInfo) {
+    public Participant createParticipant(String userId, KeycloakUserInfo userInfo) {
+        // Check if participant already exists with this userId
+        if (participantRepository.findByUserId(userId) != null) {
+            throw new IllegalStateException("Participant already exists with userId: " + userId);
+        }
+
+        // Create new participant
         Participant participant = Participant.builder()
                 .userId(userId)
                 .firstName(userInfo.getFirstName())
                 .lastName(userInfo.getLastName())
                 .email(userInfo.getEmail())
+                .enrollments(new ArrayList<>())
+                .certifications(new ArrayList<>())
                 .build();
 
-        participant = participantRepository.save(participant);
+        // Save and return the new participant
+        return participantRepository.save(participant);
+    }
+
+    @Override
+    public Participant updateParticipant(Integer id, Participant participant) {
+        return null;
+    }
+
+    @Override
+    public ParticipantDTO getParticipantByUserId(String userId) {
+        Participant participant = participantRepository.findByUserId(userId);
+        if (participant == null) {
+            return null; // or throw new IllegalArgumentException("Participant not found with userId: " + userId);
+        }
         return convertToDTO(participant);
     }
 
     @Override
-    public ParticipantDTO updateParticipant(Integer id, ParticipantDTO participantDTO) {
-        Optional<Participant> existingParticipant = participantRepository.findById(id);
-        if (existingParticipant.isPresent()) {
-            Participant participant = existingParticipant.get();
-            participant.setFirstName(participantDTO.getFirstName());
-            participant.setLastName(participantDTO.getLastName());
-            participant.setEmail(participantDTO.getEmail());
-            participant.setPhone(participantDTO.getPhone());
-            participant.setAddress(participantDTO.getAddress());
-
-            participant = participantRepository.save(participant);
-            return convertToDTO(participant);
-        }
-        return null;
+    public List<Certification> getParticipantCertifications(Integer participantId) {
+        return List.of();
     }
-
-    @Override
-    public Optional<ParticipantDTO> getParticipantByUserId(String userId) {
-        return participantRepository.findByUserId(userId)
-                .map(this::convertToDTO);
-    }
-
-    @Override
-    public List<CertificationDTO> getParticipantCertifications(Integer participantId) {
-        return certificationRepository.findByParticipantId(participantId).stream()
-                .map(cert -> CertificationDTO.builder()
-                        .id(cert.getId())
-                        .participantId(cert.getParticipant().getId())
-                        .trainingId(cert.getTrainingId())
-                        .certificateNumber(cert.getCertificateNumber())
-                        .issueDate(cert.getIssueDate())
-                        .expiryDate(cert.getExpiryDate())
-                        .finalScore(cert.getFinalScore())
-                        .skillsAcquired(cert.getSkillsAcquired())
-                        .certificateUrl(cert.getCertificateUrl())
-                        .active(cert.isActive())
-                        .build())
-                .collect(Collectors.toList());
-    }
-
-    @Override
-    public void deleteParticipant(Integer id) {
-        participantRepository.deleteById(id);
-    }
-
-    @Override
-    public LearningStatsDTO getParticipantLearningStats(Integer participantId) {
-        Optional<Participant> participant = participantRepository.findById(participantId);
-        if (participant.isPresent()) {
-            return LearningStatsDTO.builder()
-                    .completedTrainings((int) participant.get().getEnrollments().stream()
-                            .filter(e -> e.getStatus() == EnrollmentStatus.COMPLETED).count())
-                    .inProgressTrainings((int) participant.get().getEnrollments().stream()
-                            .filter(e -> e.getStatus() == EnrollmentStatus.IN_PROGRESS).count())
-                    .certifications(participant.get().getCertifications().size())
-                    .build();
-        }
-        return null;
-    }
-
-
 
     private ParticipantDTO convertToDTO(Participant participant) {
         return ParticipantDTO.builder()
@@ -108,4 +74,6 @@ public class ParticipantServiceImpl implements ParticipantService {
                 .address(participant.getAddress())
                 .build();
     }
+
+
 }

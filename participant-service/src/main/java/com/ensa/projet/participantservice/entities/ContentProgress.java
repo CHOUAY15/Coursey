@@ -18,21 +18,18 @@ public class ContentProgress {
     private Integer id;
 
     @ManyToOne
-    @JoinColumn(name = "enrollment_id")
-    private TrainingEnrollment enrollment;
+    @JoinColumn(name = "moduleProgress_id")
+    private ModuleProgress moduleProgress;
 
     private Integer contentId;
 
     private String contentType;
 
-    @Column(name = "completion_date")
-    private LocalDateTime completionDate;
 
     private boolean completed;
 
-    @Column(name = "time_spent_seconds")
-    private Long timeSpentSeconds;
 
-    @Column(length = 1000)
-    private String notes;
+
+
+
 }

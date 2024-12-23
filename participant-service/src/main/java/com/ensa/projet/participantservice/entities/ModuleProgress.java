@@ -1,9 +1,12 @@
 package com.ensa.projet.participantservice.entities;
 
+import com.ensa.projet.participantservice.dto.ModuleProgressDto;
 import jakarta.persistence.*;
 import lombok.*;
 
-import java.time.LocalDateTime;
+
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "module_progress")
@@ -18,20 +21,26 @@ public class ModuleProgress {
 
     @ManyToOne
     @JoinColumn(name = "enrollment_id")
-    private TrainingEnrollment enrollment;
+    private Enrollment enrollment;
 
     private Integer moduleId;
+    private String moduleName;
 
-    private float progressPercentage;
+    @OneToMany(mappedBy = "moduleProgress")
+    private List<ContentProgress> contentProgress=new ArrayList<>();
 
-    @Column(name = "start_date")
-    private LocalDateTime startDate;
+    @Enumerated(EnumType.STRING)
+    private ModuleStatus status;
 
-    @Column(name = "completion_date")
-    private LocalDateTime completionDate;
+    public ModuleProgressDto toDto() {
+        return ModuleProgressDto.builder()
+                .id(this.id)
+                .moduleId(this.moduleId)
+                .status(this.status)
+                .moduleName(this.moduleName)
+                .build();
+    }
 
-    @Column(name = "last_accessed")
-    private LocalDateTime lastAccessed;
 
-    private boolean completed;
+
 }

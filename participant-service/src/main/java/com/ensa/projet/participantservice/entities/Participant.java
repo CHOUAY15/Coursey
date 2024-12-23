@@ -30,7 +30,7 @@ public class Participant {
     private String userId;
 
     @OneToMany(mappedBy = "participant", cascade = CascadeType.ALL)
-    private List<TrainingEnrollment> enrollments = new ArrayList<>();
+    private List<Enrollment> enrollments = new ArrayList<>();
 
     @OneToMany(mappedBy = "participant", cascade = CascadeType.ALL)
     private List<Certification> certifications = new ArrayList<>();

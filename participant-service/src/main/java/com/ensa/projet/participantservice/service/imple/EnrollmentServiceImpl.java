@@ -1,169 +1,188 @@
 package com.ensa.projet.participantservice.service.imple;
 
-import com.ensa.projet.participantservice.dto.EnrollmentDTO;
-import com.ensa.projet.participantservice.dto.ModuleProgressDTO;
-import com.ensa.projet.participantservice.entities.*;
-import com.ensa.projet.participantservice.repository.*;
+import com.ensa.projet.participantservice.client.TrainingServiceClient;
+import com.ensa.projet.participantservice.dto.EnrollmentDto;
+import com.ensa.projet.participantservice.dto.TrainingDTO;
+import com.ensa.projet.participantservice.entities.Enrollment;
+import com.ensa.projet.participantservice.entities.ModuleProgress;
+import com.ensa.projet.participantservice.entities.ModuleStatus;
+import com.ensa.projet.participantservice.entities.Participant;
+import com.ensa.projet.participantservice.entities.EnrollmentStatus;
+import com.ensa.projet.participantservice.repository.ModuleProgressRepository;
+import com.ensa.projet.participantservice.repository.TrainingEnrollmentRepository;
+import com.ensa.projet.participantservice.repository.ParticipantRepository;
 import com.ensa.projet.participantservice.service.interfaces.EnrollmentService;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.Date;
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
 public class EnrollmentServiceImpl implements EnrollmentService {
+    private final TrainingServiceClient trainingServiceClient;
+    private final TrainingEnrollmentRepository enrollmentRepository;
+    private final ParticipantRepository participantRepository;
+    private final ModuleProgressRepository moduleProgressRepository;
 
-    @Autowired
-    private TrainingEnrollmentRepository enrollmentRepository;
-
-    @Autowired
-    private ParticipantRepository participantRepository;
-
-    @Autowired
-    private ModuleProgressRepository moduleProgressRepository;
-
-    @Autowired
-    private ContentProgressRepository contentProgressRepository;
+    public EnrollmentServiceImpl(TrainingServiceClient trainingServiceClient,
+                                 TrainingEnrollmentRepository enrollmentRepository,
+                                 ParticipantRepository participantRepository,
+                                 ModuleProgressRepository moduleProgressRepository) {
+        this.trainingServiceClient = trainingServiceClient;
+        this.enrollmentRepository = enrollmentRepository;
+        this.participantRepository = participantRepository;
+        this.moduleProgressRepository = moduleProgressRepository;
+    }
 
     @Override
-    public EnrollmentDTO enrollInTraining(Integer participantId, Integer trainingId) {
-        if (isEnrolled(participantId, trainingId)) {
-            return null;
+    public EnrollmentDto enrollInTraining(Integer participantId, Integer trainingId) {
+        Participant participant = participantRepository.findById(participantId)
+                .orElseThrow(() -> new IllegalArgumentException("Participant not found"));
+
+        if (enrollmentRepository.findByParticipantIdAndTrainingId(participantId, trainingId) != null) {
+            throw new IllegalStateException("Already enrolled");
         }
 
-        var participant = participantRepository.findById(participantId).orElse(null);
-        if (participant == null) {
-            return null;
+        TrainingDTO training = trainingServiceClient.getTraining(trainingId);
+        Enrollment enrollment = createEnrollment(participant, trainingId, training);
+        enrollmentRepository.save(enrollment);
+
+        return mapToEnrollmentDto(enrollment);
+    }
+
+    @Override
+    public EnrollmentDto getEnrollment(Integer participantId, Integer trainingId) {
+        Enrollment enrollment = enrollmentRepository.findByParticipantIdAndTrainingId(participantId, trainingId);
+        if (enrollment == null) {
+            return createEmptyEnrollmentDto(participantId, trainingId);
         }
-
-        TrainingEnrollment enrollment = TrainingEnrollment.builder()
-                .participant(participant)
-                .trainingId(trainingId)
-                .enrollmentDate(LocalDateTime.now())
-                .status(EnrollmentStatus.ENROLLED)
-                .overallProgress(0.0f)
-                .build();
-
-        enrollment = enrollmentRepository.save(enrollment);
-        return convertToDTO(enrollment);
+        return mapToEnrollmentDto(enrollment);
     }
 
     @Override
-    public EnrollmentDTO getEnrollment(Integer enrollmentId) {
-        return enrollmentRepository.findById(enrollmentId)
-                .map(this::convertToDTO)
-                .orElse(null);
-    }
+    public List<EnrollmentDto> getParticipantEnrollments(Integer participantId) {
+        Participant participant = participantRepository.findById(participantId)
+                .orElseThrow(() -> new IllegalArgumentException("Participant not found"));
 
-    @Override
-    public List<EnrollmentDTO> getParticipantEnrollments(Integer participantId) {
-        return enrollmentRepository.findByParticipantId(participantId).stream()
-                .map(this::convertToDTO)
-                .collect(Collectors.toList());
-    }
-
-    @Override
-    public void updateModuleProgress(Integer enrollmentId, Integer moduleId, ModuleProgressDTO progress) {
-        var moduleProgress = moduleProgressRepository.findByEnrollmentIdAndModuleId(enrollmentId, moduleId)
-                .orElse(new ModuleProgress());
-
-        var enrollment = enrollmentRepository.findById(enrollmentId).orElse(null);
-        if (enrollment == null) return;
-
-        moduleProgress.setEnrollment(enrollment);
-        moduleProgress.setModuleId(moduleId);
-        moduleProgress.setProgressPercentage(progress.getProgressPercentage());
-        moduleProgress.setLastAccessed(LocalDateTime.now());
-        moduleProgress.setCompleted(progress.isCompleted());
-
-        if (progress.isCompleted() && moduleProgress.getCompletionDate() == null) {
-            moduleProgress.setCompletionDate(LocalDateTime.now());
-        }
-
-        moduleProgressRepository.save(moduleProgress);
-        updateEnrollmentProgress(enrollmentId);
-    }
-
-    @Override
-    public void markContentComplete(Integer enrollmentId, Integer contentId) {
-        var contentProgress = contentProgressRepository.findByEnrollmentIdAndContentId(enrollmentId, contentId)
-                .orElse(new ContentProgress());
-
-        var enrollment = enrollmentRepository.findById(enrollmentId).orElse(null);
-        if (enrollment == null) return;
-
-        contentProgress.setEnrollment(enrollment);
-        contentProgress.setContentId(contentId);
-        contentProgress.setCompleted(true);
-        contentProgress.setCompletionDate(LocalDateTime.now());
-
-        contentProgressRepository.save(contentProgress);
-        updateEnrollmentProgress(enrollmentId);
+        return participant.getEnrollments().stream()
+                .map(this::mapToEnrollmentDto)
+                .toList();
     }
 
     @Override
     public void markModuleComplete(Integer enrollmentId, Integer moduleId) {
-        var moduleProgress = moduleProgressRepository.findByEnrollmentIdAndModuleId(enrollmentId, moduleId)
-                .orElse(new ModuleProgress());
+        Enrollment enrollment = enrollmentRepository.findById(enrollmentId)
+                .orElseThrow(() -> new IllegalArgumentException("Enrollment not found"));
 
-        var enrollment = enrollmentRepository.findById(enrollmentId).orElse(null);
-        if (enrollment == null) return;
-
-        moduleProgress.setEnrollment(enrollment);
-        moduleProgress.setModuleId(moduleId);
-        moduleProgress.setProgressPercentage(100f);
-        moduleProgress.setCompleted(true);
-        moduleProgress.setCompletionDate(LocalDateTime.now());
-
-        moduleProgressRepository.save(moduleProgress);
-        updateEnrollmentProgress(enrollmentId);
+        ModuleProgress currentModule = findModuleProgress(enrollment, moduleId);
+        updateModuleStatus(currentModule, enrollment);
     }
 
     @Override
-    public void cancelEnrollment(Integer enrollmentId) {
-        enrollmentRepository.deleteById(enrollmentId);
+    public EnrollmentDto findEnrollemntById(Integer enrollmentId) {
+        // Find the enrollment by its ID using the repository
+        Enrollment enrollment = enrollmentRepository.findById(enrollmentId)
+                .orElseThrow(() -> new IllegalArgumentException("Enrollment not found"));
+
+        // Map the entity to a DTO using the existing mapping function
+        return mapToEnrollmentDto(enrollment);
     }
 
-    @Override
-    public boolean isEnrolled(Integer participantId, Integer trainingId) {
-        return enrollmentRepository.findByParticipantIdAndTrainingId(participantId, trainingId).isPresent();
-    }
 
-    private void updateEnrollmentProgress(Integer enrollmentId) {
-        var enrollment = enrollmentRepository.findById(enrollmentId).orElse(null);
-        if (enrollment == null) return;
-
-        float totalModules = enrollment.getModuleProgresses().size();
-        float completedModules = enrollment.getModuleProgresses().stream()
-                .filter(ModuleProgress::isCompleted)
-                .count();
-
-        float progress = totalModules > 0 ? (completedModules / totalModules) * 100 : 0;
-        enrollment.setOverallProgress(progress);
-        enrollment.setLastAccessed(LocalDateTime.now());
-
-        if (progress >= 100) {
-            enrollment.setStatus(EnrollmentStatus.COMPLETED);
-            enrollment.setCompletionDate(LocalDateTime.now());
-        } else if (progress > 0) {
-            enrollment.setStatus(EnrollmentStatus.IN_PROGRESS);
+    private Enrollment createEnrollment(Participant participant, Integer trainingId, TrainingDTO training) {
+        if (training == null) {
+            throw new IllegalArgumentException("Training not found");
         }
 
-        enrollmentRepository.save(enrollment);
+        Enrollment enrollment = new Enrollment();
+        enrollment.setParticipant(participant);
+        enrollment.setTrainingId(trainingId);
+        enrollment.setStatus(EnrollmentStatus.IN_PROGRESS);
+        enrollment.setEnrollmentDate(new Date());
+
+        List<ModuleProgress> moduleProgresses = createModuleProgresses(training, enrollment);
+        enrollment.setModuleProgresses(moduleProgresses);
+
+        return enrollment;
     }
 
-    private EnrollmentDTO convertToDTO(TrainingEnrollment enrollment) {
-        return EnrollmentDTO.builder()
+    private List<ModuleProgress> createModuleProgresses(TrainingDTO training, Enrollment enrollment) {
+        if (training.getModules() == null) {
+            return new ArrayList<>();
+        }
+
+        return training.getModules().stream()
+                .map(module -> ModuleProgress.builder()
+                        .moduleId(module.getId())
+                        .moduleName(module.getTitle())
+                        .status(module.getOrderIndex() == 1 ? ModuleStatus.IN_PROGRESS : ModuleStatus.ENROLLED)
+                        .enrollment(enrollment)
+                        .build())
+                .toList();
+    }
+
+    private EnrollmentDto createEmptyEnrollmentDto(Integer participantId, Integer trainingId) {
+        return EnrollmentDto.builder()
+                .id(null)
+                .participantId(participantId)
+                .trainingId(trainingId)
+                .status(null)
+                .enrollmentDate(null)
+                .moduleProgresses(new ArrayList<>())
+                .build();
+    }
+
+    private EnrollmentDto mapToEnrollmentDto(Enrollment enrollment) {
+        return EnrollmentDto.builder()
                 .id(enrollment.getId())
                 .participantId(enrollment.getParticipant().getId())
                 .trainingId(enrollment.getTrainingId())
-                .enrollmentDate(enrollment.getEnrollmentDate())
-                .lastAccessed(enrollment.getLastAccessed())
-                .completionDate(enrollment.getCompletionDate())
                 .status(enrollment.getStatus())
-                .overallProgress(enrollment.getOverallProgress())
+                .enrollmentDate(enrollment.getEnrollmentDate())
+                .moduleProgresses(enrollment.getModuleProgresses().stream()
+                        .map(ModuleProgress::toDto)
+                        .toList())
                 .build();
+    }
+
+    private ModuleProgress findModuleProgress(Enrollment enrollment, Integer moduleId) {
+        return enrollment.getModuleProgresses().stream()
+                .filter(mp -> mp.getModuleId().equals(moduleId))
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("Module not found"));
+    }
+
+    private void updateModuleStatus(ModuleProgress currentModule, Enrollment enrollment) {
+        if (currentModule.getStatus() != ModuleStatus.IN_PROGRESS) {
+            throw new IllegalStateException("Module must be IN_PROGRESS to be marked complete");
+        }
+
+        currentModule.setStatus(ModuleStatus.COMPLETED);
+        moduleProgressRepository.save(currentModule);
+
+        updateNextModule(enrollment);
+        checkAndUpdateEnrollmentStatus(enrollment);
+    }
+
+    private void updateNextModule(Enrollment enrollment) {
+        enrollment.getModuleProgresses().stream()
+                .filter(mp -> mp.getStatus() == ModuleStatus.ENROLLED)
+                .min(Comparator.comparing(ModuleProgress::getModuleId))
+                .ifPresent(nextModule -> {
+                    nextModule.setStatus(ModuleStatus.IN_PROGRESS);
+                    moduleProgressRepository.save(nextModule);
+                });
+    }
+
+    private void checkAndUpdateEnrollmentStatus(Enrollment enrollment) {
+        boolean allCompleted = enrollment.getModuleProgresses().stream()
+                .allMatch(mp -> mp.getStatus() == ModuleStatus.COMPLETED);
+
+        if (allCompleted) {
+            enrollment.setStatus(EnrollmentStatus.COMPLETED);
+            enrollmentRepository.save(enrollment);
+        }
     }
 }

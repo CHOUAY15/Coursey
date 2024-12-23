@@ -1,18 +1,19 @@
 package com.ensa.projet.participantservice.service.interfaces;
 
-import com.ensa.projet.participantservice.dto.CertificationDTO;
 import com.ensa.projet.participantservice.dto.KeycloakUserInfo;
 import com.ensa.projet.participantservice.dto.ParticipantDTO;
-import com.ensa.projet.participantservice.dto.LearningStatsDTO;
+import com.ensa.projet.participantservice.entities.Certification;
+import com.ensa.projet.participantservice.entities.Participant;
 
 import java.util.List;
-import java.util.Optional;
+
+
 
 public interface ParticipantService {
-    ParticipantDTO createParticipant(String userId, KeycloakUserInfo userInfo);
-    ParticipantDTO updateParticipant(Integer id, ParticipantDTO participantDTO);
-    Optional<ParticipantDTO> getParticipantByUserId(String userId);
-    List<CertificationDTO> getParticipantCertifications(Integer participantId);
-    void deleteParticipant(Integer id);
-    LearningStatsDTO getParticipantLearningStats(Integer participantId);
+    Participant createParticipant(String userId, KeycloakUserInfo userInfo);
+    Participant updateParticipant(Integer id, Participant participant);
+    ParticipantDTO getParticipantByUserId(String userId);
+    List<Certification> getParticipantCertifications(Integer participantId);
+
+
 }

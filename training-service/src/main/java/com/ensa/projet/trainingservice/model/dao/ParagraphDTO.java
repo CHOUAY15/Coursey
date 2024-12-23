@@ -1,17 +1,17 @@
 package com.ensa.projet.trainingservice.model.dao;
 
-
-import lombok.*;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class ContentDTO {
+public class ParagraphDTO {
     private Integer id;
     private String title;
     private String description;
-
-    private String url;
-    private Integer orderIndex;
+    private String image;
 }

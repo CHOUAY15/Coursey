@@ -2,17 +2,16 @@ package com.ensa.projet.trainingservice.model.entities;
 
 import jakarta.persistence.*;
 import lombok.*;
-
 import java.util.ArrayList;
 import java.util.List;
 
 @Entity
-@Table(name = "contents")
+@Table(name = "paragraphs")
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class Content {
+public class Paragraph {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
@@ -23,17 +22,9 @@ public class Content {
     @Column(length = 2000)
     private String description;
 
-
-    private String url;
-
-    @Column(name = "order_index")
-    private Integer orderIndex;
+    private String image;
 
     @ManyToOne
-    @JoinColumn(name = "module_id", nullable = false)
-    private Module module;
-    @OneToMany(mappedBy = "content", cascade = CascadeType.ALL, orphanRemoval = true)
-    @Builder.Default
-    private List<Paragraph> paragraphs = new ArrayList<>();
+    @JoinColumn(name = "content_id", nullable = false)
+    private Content content;
 }
-
