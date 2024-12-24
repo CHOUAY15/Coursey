@@ -13,6 +13,7 @@ public class ModuleDTO {
     private String title;
     private String description;
     private Integer orderIndex;
+    private boolean isFinal;
 
     private List<ContentDTO> contents;
 }

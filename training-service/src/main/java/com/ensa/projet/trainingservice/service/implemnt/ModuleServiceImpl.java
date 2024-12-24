@@ -92,10 +92,32 @@ public class ModuleServiceImpl implements ModuleService {
         return convertToContentDTO(savedContent);
     }
 
+    @Override
+    public List<QuizDTO> getQuizzesByModuleId(Integer moduleId) {
+        Module module = moduleRepository.findById(moduleId)
+                .orElseThrow(() -> new ResourceNotFoundException("Module not found with id: " + moduleId));
+
+        return module.getModuleQuizzes().stream()
+                .map(this::convertToQuizDTO)
+                .collect(Collectors.toList());
+    }
+    private QuizDTO convertToQuizDTO(Quiz quiz) {
+        return QuizDTO.builder()
+                .id(quiz.getId())
+                .question(quiz.getQuestion())
+                .options(quiz.getOptions())
+                .correctAnswerIndex(quiz.getCorrectAnswerIndex())
+                .isFinalQuiz(quiz.isFinalQuiz())
+                .moduleId(quiz.getModule().getId())
+                .trainingId(quiz.getTraining() != null ? quiz.getTraining().getId() : null)
+                .build();
+    }
+
     private ModuleDTO convertToModuleDTO(Module module) {
         return ModuleDTO.builder()
                 .id(module.getId())
                 .title(module.getTitle())
+                .isFinal(module.isFinal())
                 .description(module.getDescription())
                 .orderIndex(module.getOrderIndex())
                 .contents(module.getContents().stream()

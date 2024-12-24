@@ -4,6 +4,7 @@ package com.ensa.projet.trainingservice.service.interfaces;
 import com.ensa.projet.trainingservice.model.dao.ContentDTO;
 import com.ensa.projet.trainingservice.model.dao.ModuleDTO;
 import com.ensa.projet.trainingservice.model.dao.ParagraphDTO;
+import com.ensa.projet.trainingservice.model.dao.QuizDTO;
 import com.ensa.projet.trainingservice.model.entities.Content;
 import com.ensa.projet.trainingservice.model.entities.Module;
 import com.ensa.projet.trainingservice.model.entities.Paragraph;
@@ -17,4 +18,6 @@ public interface ModuleService {
     ContentDTO addParagraphToContent(Integer contentId, Paragraph paragraph);
     ModuleDTO findByModuleId(Integer moduleId);
     List<ParagraphDTO> getParagraphsByContentId(Integer contentId);
+    List<QuizDTO> getQuizzesByModuleId(Integer moduleId);
+
 }

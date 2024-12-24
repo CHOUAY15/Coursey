@@ -37,4 +37,6 @@ public class Module {
     @OneToMany(mappedBy = "module", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     private List<Quiz> moduleQuizzes = new ArrayList<>();
+
+    private boolean isFinal;
 }
