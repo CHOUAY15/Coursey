@@ -2,8 +2,6 @@ package com.ensa.projet.trainingservice.model.entities;
 
 import jakarta.persistence.*;
 import lombok.*;
-import java.util.ArrayList;
-import java.util.List;
 
 @Entity
 @Table(name = "paragraphs")

@@ -31,6 +31,7 @@ public class TrainingServiceImpl  implements TrainingService {
     private final TrainingRepository trainingRepository;
     private final CategoryRepository categoryRepository;
     private final ModuleRepository moduleRepository;
+    private static final String GENERIC_ERROR_MESSAGE = "Training not found";
 
     public TrainingServiceImpl(
             TrainingRepository trainingRepository,
@@ -73,7 +74,7 @@ public class TrainingServiceImpl  implements TrainingService {
     @Override
     public TrainingDTO updateTraining(Integer id, TrainingDTO trainingDTO) {
         Training training = trainingRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Training not found"));
+                .orElseThrow(() -> new ResourceNotFoundException(GENERIC_ERROR_MESSAGE));
 
         if (!training.getCategory().getId().equals(trainingDTO.getCategoryId())) {
             Category category = categoryRepository.findById(trainingDTO.getCategoryId())
@@ -95,7 +96,7 @@ public class TrainingServiceImpl  implements TrainingService {
     @Override
     public void deleteTraining(Integer id) {
         if (!trainingRepository.existsById(id)) {
-            throw new ResourceNotFoundException("Training not found");
+            throw new ResourceNotFoundException(GENERIC_ERROR_MESSAGE);
         }
         trainingRepository.deleteById(id);
     }
@@ -103,7 +104,7 @@ public class TrainingServiceImpl  implements TrainingService {
     @Override
     public TrainingDTO getTrainingById(Integer id) {
         Training training = trainingRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Training not found"));
+                .orElseThrow(() -> new ResourceNotFoundException(GENERIC_ERROR_MESSAGE));
         return convertToDTO(training);
     }
 
@@ -136,7 +137,7 @@ public class TrainingServiceImpl  implements TrainingService {
     @Override
     public ModuleDTO addModule(Integer trainingId, ModuleDTO moduleDTO) {
         Training training = trainingRepository.findById(trainingId)
-                .orElseThrow(() -> new ResourceNotFoundException("Training not found"));
+                .orElseThrow(() -> new ResourceNotFoundException(GENERIC_ERROR_MESSAGE));
 
         Module module = new Module();
         module.setTitle(moduleDTO.getTitle());
@@ -150,7 +151,7 @@ public class TrainingServiceImpl  implements TrainingService {
     @Override
     public void publishTraining(Integer id) {
         Training training = trainingRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Training not found"));
+                .orElseThrow(() -> new ResourceNotFoundException(GENERIC_ERROR_MESSAGE));
         training.setPublished(true);
         trainingRepository.save(training);
     }
@@ -158,7 +159,7 @@ public class TrainingServiceImpl  implements TrainingService {
     @Override
     public void unpublishTraining(Integer id) {
         Training training = trainingRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Training not found"));
+                .orElseThrow(() -> new ResourceNotFoundException(GENERIC_ERROR_MESSAGE));
         training.setPublished(false);
         trainingRepository.save(training);
     }

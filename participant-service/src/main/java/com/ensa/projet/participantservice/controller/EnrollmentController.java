@@ -1,10 +1,7 @@
 package com.ensa.projet.participantservice.controller;
 
-
 import com.ensa.projet.participantservice.dto.EnrollmentDto;
-
 import com.ensa.projet.participantservice.service.interfaces.EnrollmentService;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -14,23 +11,30 @@ import java.util.List;
 @RequestMapping("/api/enrollments")
 public class EnrollmentController {
 
-    @Autowired
-    private EnrollmentService enrollmentService;
+    private static final String GENERIC_ERROR_MESSAGE = "An error occurred: ";
+
+    private final EnrollmentService enrollmentService;
+
+    public EnrollmentController(EnrollmentService enrollmentService) {
+        this.enrollmentService = enrollmentService;
+    }
 
     @PostMapping("/enroll")
-    public ResponseEntity<?> enrollInTraining(
+    public ResponseEntity<String> enrollInTraining(
             @RequestParam Integer participantId,
             @RequestParam Integer trainingId) {
         try {
-            return ResponseEntity.ok(enrollmentService.enrollInTraining(participantId, trainingId));
+            EnrollmentDto enrollment = enrollmentService.enrollInTraining(participantId, trainingId);
+            return ResponseEntity.ok("Successfully enrolled with ID: " + enrollment.getId());
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body("Participant not found: " + e.getMessage());
         } catch (IllegalStateException e) {
             return ResponseEntity.badRequest().body("Enrollment failed: " + e.getMessage());
         } catch (Exception e) {
-            return ResponseEntity.internalServerError().body("An error occurred: " + e.getMessage());
+            return ResponseEntity.internalServerError().body(GENERIC_ERROR_MESSAGE + e.getMessage());
         }
     }
+
     @GetMapping("/{enrollmentId}")
     public ResponseEntity<EnrollmentDto> getEnrollmentById(@PathVariable Integer enrollmentId) {
         try {
@@ -39,24 +43,23 @@ public class EnrollmentController {
         } catch (IllegalArgumentException e) {
             return ResponseEntity.notFound().build();
         } catch (Exception e) {
-            return ResponseEntity.internalServerError().body(null);
+            return ResponseEntity.internalServerError().build();
         }
     }
 
-
     @PutMapping("/{enrollmentId}/modules/{moduleId}/complete")
-    public ResponseEntity<?> markModuleComplete(
+    public ResponseEntity<String> markModuleComplete(
             @PathVariable Integer enrollmentId,
             @PathVariable Integer moduleId) {
         try {
             enrollmentService.markModuleComplete(enrollmentId, moduleId);
-            return ResponseEntity.ok().build();
+            return ResponseEntity.ok().body("Module marked as complete");
         } catch (IllegalArgumentException e) {
             return ResponseEntity.notFound().build();
         } catch (IllegalStateException e) {
             return ResponseEntity.badRequest().body(e.getMessage());
         } catch (Exception e) {
-            return ResponseEntity.internalServerError().body("An error occurred: " + e.getMessage());
+            return ResponseEntity.internalServerError().body(GENERIC_ERROR_MESSAGE + e.getMessage());
         }
     }
 
@@ -68,18 +71,17 @@ public class EnrollmentController {
     }
 
     @GetMapping("/participant/{participantId}")
-    public ResponseEntity<?> getParticipantEnrollments(@PathVariable Integer participantId) {
+    public ResponseEntity<Object> getParticipantEnrollments(@PathVariable Integer participantId) {
         try {
             List<EnrollmentDto> enrollments = enrollmentService.getParticipantEnrollments(participantId);
             if (enrollments.isEmpty()) {
-                return ResponseEntity.ok().body("No enrollments found for participant: " + participantId);
+                return ResponseEntity.ok("No enrollments found for participant: " + participantId);
             }
             return ResponseEntity.ok(enrollments);
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body("Invalid request: " + e.getMessage());
         } catch (Exception e) {
-            return ResponseEntity.internalServerError().body("An error occurred: " + e.getMessage());
+            return ResponseEntity.internalServerError().body(GENERIC_ERROR_MESSAGE + e.getMessage());
         }
     }
-
 }

@@ -6,7 +6,7 @@ import com.ensa.projet.trainingservice.model.dao.ModuleDTO;
 import com.ensa.projet.trainingservice.model.dao.ParagraphDTO;
 import com.ensa.projet.trainingservice.model.dao.QuizDTO;
 import com.ensa.projet.trainingservice.model.entities.Content;
-import com.ensa.projet.trainingservice.model.entities.Module;
+
 import com.ensa.projet.trainingservice.model.entities.Paragraph;
 import com.ensa.projet.trainingservice.model.entities.Quiz;
 

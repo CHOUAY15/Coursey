@@ -4,7 +4,6 @@ package com.ensa.projet.participantservice.entities;
 import jakarta.persistence.*;
 import lombok.*;
 
-import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "content_progress")

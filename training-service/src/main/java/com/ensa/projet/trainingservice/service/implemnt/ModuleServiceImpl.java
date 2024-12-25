@@ -64,7 +64,7 @@ public class ModuleServiceImpl implements ModuleService {
 
         return content.getParagraphs().stream()
                 .map(this::convertToParagraphDTO)
-                .collect(Collectors.toList());
+                .toList();
     }
 
     private ParagraphDTO convertToParagraphDTO(Paragraph paragraph) {
@@ -99,7 +99,7 @@ public class ModuleServiceImpl implements ModuleService {
 
         return module.getModuleQuizzes().stream()
                 .map(this::convertToQuizDTO)
-                .collect(Collectors.toList());
+                .toList();
     }
     private QuizDTO convertToQuizDTO(Quiz quiz) {
         return QuizDTO.builder()
@@ -117,12 +117,13 @@ public class ModuleServiceImpl implements ModuleService {
         return ModuleDTO.builder()
                 .id(module.getId())
                 .title(module.getTitle())
-                .isFinal(module.isFinal())
+                .finished(module.isFinal())
+                .trainingId(module.getTraining() != null ? module.getTraining().getId() : null)
                 .description(module.getDescription())
                 .orderIndex(module.getOrderIndex())
                 .contents(module.getContents().stream()
                         .map(this::convertToContentDTO)
-                        .collect(Collectors.toList()))
+                        .toList())
                 .build();
     }
 

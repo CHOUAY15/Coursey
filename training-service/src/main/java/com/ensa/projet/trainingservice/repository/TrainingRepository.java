@@ -8,7 +8,5 @@ import java.util.List;
 
 public interface TrainingRepository extends JpaRepository<Training, Integer> {
     List<Training> findByCategoryId(Integer categoryId);
-    List<Training> findBySupportARTrue();
-    List<Training> findBySupportAITrue();
-    List<Training> findByPublishedTrue();
+
 }

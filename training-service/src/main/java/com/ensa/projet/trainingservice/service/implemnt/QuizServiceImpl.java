@@ -14,7 +14,7 @@ import com.ensa.projet.trainingservice.service.interfaces.QuizService;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
-import java.util.stream.Collectors;
+
 
 
 @Service
@@ -36,15 +36,16 @@ public class QuizServiceImpl implements QuizService {
         return quizRepository.findByTrainingIdAndIsFinalQuizTrue(trainingId)
                 .stream()
                 .map(this::convertToQuizDTO)
-                .collect(Collectors.toList());
+                .toList(); // Produces an unmodifiable list
     }
+
 
     @Override
     public List<QuizDTO> getQuizzesByModuleId(Integer moduleId) {
         return quizRepository.findByModuleId(moduleId)
                 .stream()
                 .map(this::convertToQuizDTO)
-                .collect(Collectors.toList());
+                .toList();
     }
 
     @Override
@@ -52,7 +53,7 @@ public class QuizServiceImpl implements QuizService {
         return quizRepository.findByTrainingIdAndIsFinalQuizTrue(trainingId)
                 .stream()
                 .map(this::convertToQuizDTO)
-                .collect(Collectors.toList());
+                .toList();
     }
 
     @Override

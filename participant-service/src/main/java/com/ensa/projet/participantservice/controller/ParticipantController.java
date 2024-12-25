@@ -4,33 +4,34 @@ import com.ensa.projet.participantservice.dto.KeycloakUserInfo;
 import com.ensa.projet.participantservice.dto.ParticipantDTO;
 import com.ensa.projet.participantservice.entities.Participant;
 import com.ensa.projet.participantservice.service.interfaces.ParticipantService;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.Optional;
 
 
 @RestController
 @RequestMapping("/api/participants")
 public class ParticipantController {
 
-    @Autowired
-    private ParticipantService participantService;
 
+    private final ParticipantService participantService;
 
+    public ParticipantController(ParticipantService participantService) {
+        this.participantService = participantService;
+    }
 
     @PostMapping
-    public ResponseEntity<?> createParticipant(
+    public ResponseEntity<Participant> createParticipant(
             @RequestParam String userId,
             @RequestBody KeycloakUserInfo userInfo) {
         try {
             Participant participant = participantService.createParticipant(userId, userInfo);
             return ResponseEntity.ok(participant);
         } catch (IllegalStateException e) {
-            return ResponseEntity.badRequest().body(e.getMessage());
+            return ResponseEntity.badRequest().body(null);
         } catch (Exception e) {
-            return ResponseEntity.internalServerError().body("An error occurred: " + e.getMessage());
+            // Consider creating a constant for error messages if not already defined
+            return ResponseEntity.internalServerError().build();
         }
     }
 

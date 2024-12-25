@@ -6,22 +6,23 @@ import com.ensa.projet.participantservice.entities.Certification;
 import com.ensa.projet.participantservice.entities.Participant;
 import com.ensa.projet.participantservice.repository.*;
 import com.ensa.projet.participantservice.service.interfaces.ParticipantService;
-import org.springframework.beans.factory.annotation.Autowired;
+
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
+
 
 
 @Service
 public class ParticipantServiceImpl implements ParticipantService {
 
-    @Autowired
-    private ParticipantRepository participantRepository;
 
+    private final ParticipantRepository participantRepository;
 
-
+    public ParticipantServiceImpl(ParticipantRepository participantRepository) {
+        this.participantRepository = participantRepository;
+    }
 
     @Override
     public Participant createParticipant(String userId, KeycloakUserInfo userInfo) {
@@ -53,7 +54,7 @@ public class ParticipantServiceImpl implements ParticipantService {
     public ParticipantDTO getParticipantByUserId(String userId) {
         Participant participant = participantRepository.findByUserId(userId);
         if (participant == null) {
-            return null; // or throw new IllegalArgumentException("Participant not found with userId: " + userId);
+            return null;
         }
         return convertToDTO(participant);
     }

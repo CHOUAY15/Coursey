@@ -13,6 +13,7 @@ import com.ensa.projet.trainingservice.service.interfaces.CategoryService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 @Service
@@ -20,6 +21,7 @@ import java.util.List;
 public class CategoryServiceImpl implements CategoryService {
 
     private final CategoryRepository categoryRepository;
+    private static final String GENERIC_ERROR_MESSAGE = "Category not found";
 
     public CategoryServiceImpl(CategoryRepository categoryRepository) {
         this.categoryRepository = categoryRepository;
@@ -39,7 +41,7 @@ public class CategoryServiceImpl implements CategoryService {
     @Override
     public CategoryDTO updateCategory(Integer id, CategoryDTO categoryDTO) {
         Category category = categoryRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Category not found"));
+                .orElseThrow(() -> new ResourceNotFoundException(GENERIC_ERROR_MESSAGE));
 
         category.setName(categoryDTO.getName());
         category.setDescription(categoryDTO.getDescription());
@@ -52,7 +54,7 @@ public class CategoryServiceImpl implements CategoryService {
     @Override
     public void deleteCategory(Integer id) {
         if (!categoryRepository.existsById(id)) {
-            throw new ResourceNotFoundException("Category not found");
+            throw new ResourceNotFoundException(GENERIC_ERROR_MESSAGE);
         }
         categoryRepository.deleteById(id);
     }
@@ -60,7 +62,7 @@ public class CategoryServiceImpl implements CategoryService {
     @Override
     public CategoryDTO getCategory(Integer id) {
         Category category = categoryRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Category not found"));
+                .orElseThrow(() -> new ResourceNotFoundException(GENERIC_ERROR_MESSAGE));
         return convertToDTO(category);
     }
 
@@ -115,7 +117,7 @@ public class CategoryServiceImpl implements CategoryService {
     }
 
     private List<ModuleDTO> convertModules(List<Module> modules) {
-        if (modules == null) return null;
+        if (modules == null) return Collections.emptyList();
         List<ModuleDTO> moduleDTOs = new ArrayList<>();
         for (Module module : modules) {
             ModuleDTO moduleDTO = ModuleDTO.builder()
