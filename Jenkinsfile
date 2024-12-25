@@ -69,9 +69,14 @@ pipeline {
                 script {
                     def envName = env.GIT_BRANCH == BRANCH_PROD ? "prod" : "dev"
                     def modifiedServicesList = env.MODIFIED_SERVICES ? env.MODIFIED_SERVICES.split(',') : []
+                    echo "Current directory: ${pwd()}"
+                    sh 'ls -la'  // List all files in current directory
 
                     modifiedServicesList.each { service ->
+                        echo "Processing service: ${service}"
                         dir(service) {
+                            echo "Service directory contents:"
+                            sh 'ls -la'  // List all files in service directory
                             def version = getEnvVersion(service, envName)
                             echo "Building Docker image for ${service} with version ${version}"
 
@@ -98,16 +103,26 @@ pipeline {
 }
 def getEnvVersion(service, envName) {
     dir(service) {
-        def pom = readMavenPom file: 'pom.xml'
-        def artifactVersion = pom.version
-        def gitCommit = sh(returnStdout: true, script: 'git rev-parse HEAD').trim()
+        // First verify the pom.xml exists
+        if (!fileExists('pom.xml')) {
+            error "pom.xml not found in directory: ${service}"
+        }
 
-        def versionNumber = gitCommit ?
-                "${artifactVersion}-${envName}.${env.BUILD_NUMBER}.${gitCommit.take(8)}" :
-                "${artifactVersion}-${envName}.${env.BUILD_NUMBER}"
+        try {
+            def pom = readMavenPom file: 'pom.xml'
+            def artifactVersion = pom.version
+            def gitCommit = sh(returnStdout: true, script: 'git rev-parse HEAD').trim()
 
-        echo "Build version for service ${service}: ${versionNumber}"
-        return versionNumber
+            def versionNumber = gitCommit ?
+                    "${artifactVersion}-${envName}.${env.BUILD_NUMBER}.${gitCommit.take(8)}" :
+                    "${artifactVersion}-${envName}.${env.BUILD_NUMBER}"
+
+            echo "Build version for service ${service}: ${versionNumber}"
+            return versionNumber
+        } catch (Exception e) {
+            echo "Error reading pom.xml for service ${service}: ${e.message}"
+            throw e
+        }
     }
 }
 
