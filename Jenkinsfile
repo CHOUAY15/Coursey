@@ -95,6 +95,115 @@ pipeline {
             }
         }
 
+        stage('Deploy to Test Server') {
+            steps {
+                script {
+                    // Check if there are any modified services
+                    if (!env.MODIFIED_SERVICES) {
+                        echo "No services were modified. Skipping deployment."
+                        return
+                    }
+
+                    sshagent(credentials: ['ssh-credentials-id']) {
+                        def envName = env.GIT_BRANCH == BRANCH_PROD ? "prod" : "test"
+                        def modifiedServicesList = env.MODIFIED_SERVICES.split(',')
+
+                        withCredentials([usernamePassword(credentialsId: "${NEXUS_CREDENTIALS_ID}",
+                                usernameVariable: 'NEXUS_USERNAME',
+                                passwordVariable: 'NEXUS_PASSWORD')]) {
+
+                            // First, verify SSH connection and required tools
+                            sh """
+                        ssh -o StrictHostKeyChecking=no ${TEST_SERVER_USER}@${TEST_SERVER} '
+                            which docker docker-compose || { echo "Docker or docker-compose not found"; exit 1; }
+                            docker info || { echo "Docker daemon not running or permission issues"; exit 1; }
+                        '
+                    """
+
+                            // Login to Nexus on test server
+                            sh """
+                        echo \$NEXUS_PASSWORD | ssh -o StrictHostKeyChecking=no ${TEST_SERVER_USER}@${TEST_SERVER} \
+                        'docker login ${NEXUS_PRIVATE} --username "\${NEXUS_USERNAME}" --password-stdin'
+                    """
+
+                            // Process each modified service
+                            modifiedServicesList.each { service ->
+                                def version = getEnvVersion(service, envName)
+                                echo "Deploying ${service} version ${version}"
+
+                                // Update environment file and deploy
+                                sh """
+                            ssh -o StrictHostKeyChecking=no ${TEST_SERVER_USER}@${TEST_SERVER} '
+                                set -ex
+                                cd ${PROJECT_PATH}
+                                
+                                # Backup existing containers' state if needed
+                                docker-compose ps > containers_state.txt || true
+                                
+                                # Update .env file
+                                echo "NEXUS_PRIVATE=${NEXUS_PRIVATE}" > .env
+                                echo "VERSION=${version}" >> .env
+                                
+                                # Pull and update only modified service
+                                docker-compose pull ${service}
+                                docker-compose up -d --no-deps ${service}
+                                
+                                # Wait for service to be healthy
+                                TIMEOUT=300
+                                echo "Waiting for ${service} to be healthy..."
+                                while [ \$TIMEOUT -gt 0 ]; do
+                                    if docker-compose ps ${service} | grep -q "Up"; then
+                                        echo "${service} is up and running"
+                                        break
+                                    fi
+                                    sleep 5
+                                    TIMEOUT=\$((TIMEOUT-5))
+                                done
+                                
+                                if [ \$TIMEOUT -le 0 ]; then
+                                    echo "${service} failed to start within timeout"
+                                    docker-compose logs ${service}
+                                    exit 1
+                                fi
+                            '
+                        """
+                            }
+
+                            // Final verification of all services
+                            sh """
+                        ssh -o StrictHostKeyChecking=no ${TEST_SERVER_USER}@${TEST_SERVER} '
+                            cd ${PROJECT_PATH}
+                            
+                            echo "Verifying all services..."
+                            if ! docker-compose ps | grep -q "Exit"; then
+                                echo "All services are running correctly"
+                            else
+                                echo "Some services failed to start:"
+                                docker-compose ps
+                                docker-compose logs
+                                exit 1
+                            fi
+                        '
+                    """
+                        }
+                    }
+                }
+            }
+            post {
+                failure {
+                    // On failure, collect logs for debugging
+                    sh """
+                ssh -o StrictHostKeyChecking=no ${TEST_SERVER_USER}@${TEST_SERVER} '
+                    cd ${PROJECT_PATH}
+                    docker-compose logs > deployment_failure_logs.txt
+                    docker ps -a > container_status.txt
+                '
+            """
+                    archiveArtifacts artifacts: '**/deployment_failure_logs.txt,**/container_status.txt', allowEmptyArchive: true
+                }
+            }
+        }
+
 
 
 
