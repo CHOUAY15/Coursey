@@ -94,6 +94,7 @@ pipeline {
                 }
             }
         }
+        //test server
 
         stage('Deploy to Test Server') {
             steps {
