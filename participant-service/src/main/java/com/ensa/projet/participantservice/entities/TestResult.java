@@ -1,5 +1,6 @@
 package com.ensa.projet.participantservice.entities;
 
+import com.ensa.projet.participantservice.dto.TrainingDTO;
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;
@@ -14,9 +15,8 @@ public class TestResult {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
 
-    @ManyToOne
-    @JoinColumn(name = "participant_id")
-    private Participant participant;
+    @Column(name = "participant_id")
+    private Integer participantId;
 
     private Integer trainingId;
 
@@ -28,4 +28,14 @@ public class TestResult {
     private float score;
     private LocalDateTime submissionDate;
     private boolean passed;
+
+    @Transient
+    private TrainingDTO trainingDTO;
+    public void setTrainingDTO(TrainingDTO trainingDTO) {
+        this.trainingDTO = trainingDTO;
+    }
+
+    public Integer getParticipantId() {
+        return participantId;
+    }
 }

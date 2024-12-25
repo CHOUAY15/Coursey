@@ -8,6 +8,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Optional;
+
 
 @RestController
 @RequestMapping("/api/participants")
@@ -38,6 +40,12 @@ public class ParticipantController {
         if (participant == null) {
             return ResponseEntity.notFound().build();
         }
+        return ResponseEntity.ok(participant);
+    }
+
+    @GetMapping("/{id}")
+    public ResponseEntity<ParticipantDTO> getParticipantById(@PathVariable Integer id) {
+        ParticipantDTO participant = participantService.getParticipantById(id);
         return ResponseEntity.ok(participant);
     }
 

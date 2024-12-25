@@ -6,7 +6,7 @@ import com.ensa.projet.participantservice.entities.Certification;
 import com.ensa.projet.participantservice.entities.Participant;
 
 import java.util.List;
-
+import java.util.Optional;
 
 
 public interface ParticipantService {
@@ -14,6 +14,8 @@ public interface ParticipantService {
     Participant updateParticipant(Integer id, Participant participant);
     ParticipantDTO getParticipantByUserId(String userId);
     List<Certification> getParticipantCertifications(Integer participantId);
+    ParticipantDTO getParticipantById(Integer id);
+
 
 
 }

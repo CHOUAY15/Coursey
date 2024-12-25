@@ -74,6 +74,20 @@ public class ParticipantServiceImpl implements ParticipantService {
                 .address(participant.getAddress())
                 .build();
     }
+    @Override
+    public ParticipantDTO getParticipantById(Integer id) {
+        Participant participant = participantRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Participant not found"));
 
+        // Map Participant to ParticipantDTO
+        return ParticipantDTO.builder()
+                .id(participant.getId())
+                .firstName(participant.getFirstName())
+                .lastName(participant.getLastName())
+                .email(participant.getEmail())
+                .phone(participant.getPhone())
+                .address(participant.getAddress())
+                .build();
+    }
 
 }
