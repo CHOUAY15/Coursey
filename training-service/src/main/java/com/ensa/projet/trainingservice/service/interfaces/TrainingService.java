@@ -1,13 +1,13 @@
 package com.ensa.projet.trainingservice.service.interfaces;
 
-import com.ensa.projet.trainingservice.model.dao.QuizDTO;
+
 import com.ensa.projet.trainingservice.model.dao.TrainingDTO;
 
 import java.util.List;
 
-import com.ensa.projet.trainingservice.model.dao.TrainingDTO;
+
 import com.ensa.projet.trainingservice.model.dao.ModuleDTO;
-import java.util.List;
+
 
 public interface TrainingService {
      TrainingDTO createTraining(TrainingDTO trainingDTO);
