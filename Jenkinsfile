@@ -48,6 +48,7 @@ pipeline {
                 }
             }
         }
+
         stage('Maven Build and Package') {
             steps {
                 script {
@@ -56,7 +57,12 @@ pipeline {
             }
             post {
                 success {
-                    archiveArtifacts artifacts: 'target/*.jar', allowEmptyArchive: true
+                    script {
+                        // Archive artifacts from each service's target directory
+                        SERVICES.split(',').each { service ->
+                            archiveArtifacts artifacts: "${service}/target/*.jar", allowEmptyArchive: true
+                        }
+                    }
                 }
                 failure {
                     echo 'Maven build failed'
@@ -69,16 +75,15 @@ pipeline {
                 script {
                     def envName = env.GIT_BRANCH == BRANCH_PROD ? "prod" : "dev"
                     def modifiedServicesList = env.MODIFIED_SERVICES ? env.MODIFIED_SERVICES.split(',') : []
-                    echo "Current directory: ${pwd()}"
-                    sh 'ls -la'  // List all files in current directory
 
                     modifiedServicesList.each { service ->
                         echo "Processing service: ${service}"
+                        def version = getEnvVersion(service, envName)
+                        echo "Building Docker image for ${service} with version ${version}"
+
                         dir(service) {
                             echo "Service directory contents:"
-                            sh 'ls -la'  // List all files in service directory
-                            def version = getEnvVersion(service, envName)
-                            echo "Building Docker image for ${service} with version ${version}"
+                            sh 'ls -la'
 
                             withCredentials([usernamePassword(credentialsId: "${NEXUS_CREDENTIALS_ID}",
                                     usernameVariable: 'USER',
@@ -94,12 +99,10 @@ pipeline {
                 }
             }
         }
-        //test server
 
         stage('Deploy to Test Server') {
             steps {
                 script {
-                    // Check if there are any modified services
                     if (!env.MODIFIED_SERVICES) {
                         echo "No services were modified. Skipping deployment."
                         return
@@ -113,126 +116,65 @@ pipeline {
                                 usernameVariable: 'NEXUS_USERNAME',
                                 passwordVariable: 'NEXUS_PASSWORD')]) {
 
-                            // First, verify SSH connection and required tools
-                            sh """
-                        ssh -o StrictHostKeyChecking=no ${TEST_SERVER_USER}@${TEST_SERVER} '
-                            which docker docker-compose || { echo "Docker or docker-compose not found"; exit 1; }
-                            docker info || { echo "Docker daemon not running or permission issues"; exit 1; }
-                        '
-                    """
-
                             // Login to Nexus on test server
                             sh """
-                        echo \$NEXUS_PASSWORD | ssh -o StrictHostKeyChecking=no ${TEST_SERVER_USER}@${TEST_SERVER} \
-                        'docker login ${NEXUS_PRIVATE} --username "\${NEXUS_USERNAME}" --password-stdin'
-                    """
+                                echo \$NEXUS_PASSWORD | ssh -o StrictHostKeyChecking=no ${TEST_SERVER_USER}@${TEST_SERVER} \
+                                'docker login ${NEXUS_PRIVATE} --username "\${NEXUS_USERNAME}" --password-stdin'
+                            """
 
-                            // Process each modified service
                             modifiedServicesList.each { service ->
                                 def version = getEnvVersion(service, envName)
-                                echo "Deploying ${service} version ${version}"
 
-                                // Update environment file and deploy
                                 sh """
-                            ssh -o StrictHostKeyChecking=no ${TEST_SERVER_USER}@${TEST_SERVER} '
-                                set -ex
-                                cd ${PROJECT_PATH}
-                                
-                                # Backup existing containers' state if needed
-                                docker-compose ps > containers_state.txt || true
-                                
-                                # Update .env file
-                                echo "NEXUS_PRIVATE=${NEXUS_PRIVATE}" > .env
-                                echo "VERSION=${version}" >> .env
-                                
-                                # Pull and update only modified service
-                                docker-compose pull ${service}
-                                docker-compose up -d --no-deps ${service}
-                                
-                                # Wait for service to be healthy
-                                TIMEOUT=300
-                                echo "Waiting for ${service} to be healthy..."
-                                while [ \$TIMEOUT -gt 0 ]; do
-                                    if docker-compose ps ${service} | grep -q "Up"; then
-                                        echo "${service} is up and running"
-                                        break
-                                    fi
-                                    sleep 5
-                                    TIMEOUT=\$((TIMEOUT-5))
-                                done
-                                
-                                if [ \$TIMEOUT -le 0 ]; then
-                                    echo "${service} failed to start within timeout"
-                                    docker-compose logs ${service}
-                                    exit 1
-                                fi
-                            '
-                        """
+                                    ssh -o StrictHostKeyChecking=no ${TEST_SERVER_USER}@${TEST_SERVER} '
+                                        set -ex
+                                        cd ${PROJECT_PATH}
+                                        
+                                        # Update .env file
+                                        echo "NEXUS_PRIVATE=${NEXUS_PRIVATE}" > .env
+                                        echo "VERSION=${version}" >> .env
+                                        
+                                        # Pull and update service
+                                        docker-compose pull ${service}
+                                        docker-compose up -d --no-deps ${service}
+                                        
+                                        # Wait for service to be healthy
+                                        TIMEOUT=300
+                                        while [ \$TIMEOUT -gt 0 ]; do
+                                            if docker-compose ps ${service} | grep -q "Up"; then
+                                                echo "${service} is up and running"
+                                                break
+                                            fi
+                                            sleep 5
+                                            TIMEOUT=\$((TIMEOUT-5))
+                                        done
+                                        
+                                        if [ \$TIMEOUT -le 0 ]; then
+                                            echo "${service} failed to start within timeout"
+                                            docker-compose logs ${service}
+                                            exit 1
+                                        fi
+                                    '
+                                """
                             }
-
-                            // Final verification of all services
-                            sh """
-                        ssh -o StrictHostKeyChecking=no ${TEST_SERVER_USER}@${TEST_SERVER} '
-                            cd ${PROJECT_PATH}
-                            
-                            echo "Verifying all services..."
-                            if ! docker-compose ps | grep -q "Exit"; then
-                                echo "All services are running correctly"
-                            else
-                                echo "Some services failed to start:"
-                                docker-compose ps
-                                docker-compose logs
-                                exit 1
-                            fi
-                        '
-                    """
                         }
                     }
                 }
             }
-            post {
-                failure {
-                    // On failure, collect logs for debugging
-                    sh """
-                ssh -o StrictHostKeyChecking=no ${TEST_SERVER_USER}@${TEST_SERVER} '
-                    cd ${PROJECT_PATH}
-                    docker-compose logs > deployment_failure_logs.txt
-                    docker ps -a > container_status.txt
-                '
-            """
-                    archiveArtifacts artifacts: '**/deployment_failure_logs.txt,**/container_status.txt', allowEmptyArchive: true
-                }
-            }
         }
-
-
-
-
     }
-
 }
+
 def getEnvVersion(service, envName) {
-    dir(service) {
-        // First verify the pom.xml exists
-        if (!fileExists('pom.xml')) {
-            error "pom.xml not found in directory: ${service}"
-        }
+    // Don't use dir() inside dir() - this was causing the path issue
+    def pom = readMavenPom file: "${service}/pom.xml"
+    def artifactVersion = pom.version
+    def gitCommit = sh(returnStdout: true, script: 'git rev-parse HEAD').trim()
 
-        try {
-            def pom = readMavenPom file: 'pom.xml'
-            def artifactVersion = pom.version
-            def gitCommit = sh(returnStdout: true, script: 'git rev-parse HEAD').trim()
+    def versionNumber = gitCommit ?
+            "${artifactVersion}-${envName}.${env.BUILD_NUMBER}.${gitCommit.take(8)}" :
+            "${artifactVersion}-${envName}.${env.BUILD_NUMBER}"
 
-            def versionNumber = gitCommit ?
-                    "${artifactVersion}-${envName}.${env.BUILD_NUMBER}.${gitCommit.take(8)}" :
-                    "${artifactVersion}-${envName}.${env.BUILD_NUMBER}"
-
-            echo "Build version for service ${service}: ${versionNumber}"
-            return versionNumber
-        } catch (Exception e) {
-            echo "Error reading pom.xml for service ${service}: ${e.message}"
-            throw e
-        }
-    }
+    echo "Build version for service ${service}: ${versionNumber}"
+    return versionNumber
 }
-
