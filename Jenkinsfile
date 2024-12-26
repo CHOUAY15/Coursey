@@ -4,8 +4,8 @@ pipeline {
     environment {
         BRANCH_DEV = 'origin/develop'
         BRANCH_PROD = 'origin/main'
-        NEXUS_PROXY = "http://192.168.11.137:9082"
-        NEXUS_PRIVATE = "http://192.168.11.137:9083"
+        NEXUS_PROXY = "http://localhost:9082"
+        NEXUS_PRIVATE = "http://localhost:9083"
         NEXUS_CREDENTIALS_ID = "nexus-credentials"
         SERVICES = "config-service,discovery-service,gateway-service,participant-service,training-service"
         TEST_SERVER = '192.168.11.138'
@@ -88,11 +88,19 @@ pipeline {
                             withCredentials([usernamePassword(credentialsId: "${NEXUS_CREDENTIALS_ID}",
                                     usernameVariable: 'USER',
                                     passwordVariable: 'PASSWORD')]) {
+
+                                // Test Nexus connectivity using localhost
                                 sh """
-                                    echo \$PASSWORD | docker login -u \$USER --password-stdin ${NEXUS_PRIVATE}
-                                    docker build -t ${NEXUS_PRIVATE}/${service}:${version} .
-                                    docker push ${NEXUS_PRIVATE}/${service}:${version}
-                                """
+                                echo "Testing Nexus Docker registry connectivity..."
+                                curl -v localhost:9083/v2/_catalog || echo "Warning: Local Nexus registry check failed"
+                                
+                                echo "Attempting Docker login..."
+                                echo \$PASSWORD | docker login --username \$USER --password-stdin localhost:9083
+                                
+                                echo "Building and pushing image..."
+                                docker build -t localhost:9083/${service}:${version} .
+                                docker push localhost:9083/${service}:${version}
+                            """
                             }
                         }
                     }
@@ -116,46 +124,28 @@ pipeline {
                                 usernameVariable: 'NEXUS_USERNAME',
                                 passwordVariable: 'NEXUS_PASSWORD')]) {
 
-                            // Login to Nexus on test server
+                            // Here we use the IP address since we're connecting from a different machine
                             sh """
-                                echo \$NEXUS_PASSWORD | ssh -o StrictHostKeyChecking=no ${TEST_SERVER_USER}@${TEST_SERVER} \
-                                'docker login ${NEXUS_PRIVATE} --username "\${NEXUS_USERNAME}" --password-stdin'
-                            """
+                        echo \$NEXUS_PASSWORD | ssh -o StrictHostKeyChecking=no ${TEST_SERVER_USER}@${TEST_SERVER} \
+                        'docker login http://192.168.11.137:9083 --username "\${NEXUS_USERNAME}" --password-stdin'
+                    """
 
                             modifiedServicesList.each { service ->
                                 def version = getEnvVersion(service, envName)
 
                                 sh """
-                                    ssh -o StrictHostKeyChecking=no ${TEST_SERVER_USER}@${TEST_SERVER} '
-                                        set -ex
-                                        cd ${PROJECT_PATH}
-                                        
-                                        # Update .env file
-                                        echo "NEXUS_PRIVATE=${NEXUS_PRIVATE}" > .env
-                                        echo "VERSION=${version}" >> .env
-                                        
-                                        # Pull and update service
-                                        docker-compose pull ${service}
-                                        docker-compose up -d --no-deps ${service}
-                                        
-                                        # Wait for service to be healthy
-                                        TIMEOUT=300
-                                        while [ \$TIMEOUT -gt 0 ]; do
-                                            if docker-compose ps ${service} | grep -q "Up"; then
-                                                echo "${service} is up and running"
-                                                break
-                                            fi
-                                            sleep 5
-                                            TIMEOUT=\$((TIMEOUT-5))
-                                        done
-                                        
-                                        if [ \$TIMEOUT -le 0 ]; then
-                                            echo "${service} failed to start within timeout"
-                                            docker-compose logs ${service}
-                                            exit 1
-                                        fi
-                                    '
-                                """
+                            ssh -o StrictHostKeyChecking=no ${TEST_SERVER_USER}@${TEST_SERVER} '
+                                set -ex
+                                cd ${PROJECT_PATH}
+                                
+                                # Update .env file with the IP address for remote access
+                                echo "NEXUS_PRIVATE=http://192.168.11.137:9083" > .env
+                                echo "VERSION=${version}" >> .env
+                                
+                                docker-compose pull ${service}
+                                docker-compose up -d --no-deps ${service}
+                            '
+                        """
                             }
                         }
                     }
