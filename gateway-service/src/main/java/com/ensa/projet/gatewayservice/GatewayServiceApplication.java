@@ -10,6 +10,7 @@ import org.springframework.context.annotation.Bean;
 @SpringBootApplication
 public class GatewayServiceApplication {
 
+
     public static void main(String[] args) {
         SpringApplication.run(GatewayServiceApplication.class, args);
     }

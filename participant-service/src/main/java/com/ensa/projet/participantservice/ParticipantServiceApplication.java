@@ -9,6 +9,7 @@ import org.springframework.cloud.openfeign.EnableFeignClients;
 
 public class ParticipantServiceApplication {
 
+
     public static void main(String[] args) {
         SpringApplication.run(ParticipantServiceApplication.class, args);
     }
