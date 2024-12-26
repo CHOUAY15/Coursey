@@ -8,6 +8,7 @@ import org.springframework.cloud.openfeign.EnableFeignClients;
 @EnableFeignClients
 
 public class ParticipantServiceApplication {
+    //microservice 1
 
     public static void main(String[] args) {
         SpringApplication.run(ParticipantServiceApplication.class, args);
