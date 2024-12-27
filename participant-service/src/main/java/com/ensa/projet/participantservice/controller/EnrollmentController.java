@@ -20,18 +20,16 @@ public class EnrollmentController {
     }
 
     @PostMapping("/enroll")
-    public ResponseEntity<String> enrollInTraining(
+    public ResponseEntity<EnrollmentDto> enrollInTraining(
             @RequestParam Integer participantId,
             @RequestParam Integer trainingId) {
         try {
             EnrollmentDto enrollment = enrollmentService.enrollInTraining(participantId, trainingId);
-            return ResponseEntity.ok("Successfully enrolled with ID: " + enrollment.getId());
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body("Participant not found: " + e.getMessage());
-        } catch (IllegalStateException e) {
-            return ResponseEntity.badRequest().body("Enrollment failed: " + e.getMessage());
+            return ResponseEntity.ok(enrollment);
+        } catch (IllegalArgumentException | IllegalStateException e) {
+            return ResponseEntity.badRequest().build();
         } catch (Exception e) {
-            return ResponseEntity.internalServerError().body(GENERIC_ERROR_MESSAGE + e.getMessage());
+            return ResponseEntity.internalServerError().build();
         }
     }
 
