@@ -35,7 +35,7 @@ public class TestResultServiceImpl implements TestResultService {
     @Override
     public TestResult submitTestResult(TestResultSubmissionDTO submission) {
         // Get quizzes from training service
-        List<QuizDTO> quizzes = trainingServiceClient.getQuizzesByModuleId(submission.getTrainingId());
+        List<QuizDTO> quizzes = trainingServiceClient.getQuizzesByModuleId(submission.getModuleId());
 
         // Calculate score using quizzes from service
         float score = calculateScore(submission.getAnswers(), quizzes);
@@ -65,20 +65,27 @@ public class TestResultServiceImpl implements TestResultService {
     }
 
     private float calculateScore(List<ParticipantAnswerDTO> answers, List<QuizDTO> quizzes) {
-        int correctAnswers = 0;
+        if (answers == null || answers.isEmpty() || quizzes == null || quizzes.isEmpty()) {
+            return 0.0f;
+        }
 
-        // Create a map of quiz IDs to correct answers for efficient lookup
         Map<Integer, Integer> quizCorrectAnswers = quizzes.stream()
                 .collect(Collectors.toMap(QuizDTO::getId, QuizDTO::getCorrectAnswerIndex));
 
+        int correctAnswers = 0;
+        int totalAnswered = 0;
+
         for (ParticipantAnswerDTO answer : answers) {
             Integer correctIndex = quizCorrectAnswers.get(answer.getQuizId());
-            if (correctIndex != null && Objects.equals(correctIndex, answer.getSelectedAnswerIndex())) {
-                correctAnswers++;
+            if (correctIndex != null) {
+                totalAnswered++;
+                if (Objects.equals(correctIndex, answer.getSelectedAnswerIndex())) {
+                    correctAnswers++;
+                }
             }
         }
 
-        return (correctAnswers * 100.0f) / answers.size();
+        return totalAnswered > 0 ? (correctAnswers * 100.0f) / totalAnswered : 0.0f;
     }
 
     public List<TestResult> getTestResultsByParticipantId(Integer participantId) {

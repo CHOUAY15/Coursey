@@ -7,5 +7,6 @@ import java.util.List;
 public class TestResultSubmissionDTO {
     private Integer participantId;
     private Integer trainingId;
+    private Integer moduleId;
     private List<ParticipantAnswerDTO> answers;
 }
