@@ -1,54 +1,33 @@
 version: "3.8"
 services:
-  mysql-participant:
+  mysql:
     image: mysql:8.0
-    container_name: mysql-participant
+    container_name: mysql-firstaid
     environment:
-      - MYSQL_DATABASE=first_aid_participant_bd
       - MYSQL_ROOT_PASSWORD=root
+      - MYSQL_DATABASE=first_aid_participant_bd
+      - MYSQL_USER=user
+      - MYSQL_PASSWORD=password
     volumes:
-      - mysql_participant_data:/var/lib/mysql
+      - mysql_data:/var/lib/mysql
+      - ./docker/data/init.sql:/docker-entrypoint-initdb.d/init.sql
     ports:
       - "3306:3306"
-    networks:
-      - app-network
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost" ]
       interval: 30s
       timeout: 10s
       retries: 5
 
-  mysql-training:
-    image: mysql:8.0
-    container_name: mysql-training
-    environment:
-      - MYSQL_DATABASE=first_aid_training_bd
-      - MYSQL_ROOT_PASSWORD=root
-    volumes:
-      - mysql_training_data:/var/lib/mysql
-    ports:
-      - "3307:3306"
-    networks:
-      - app-network
-    healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-
-  # PHPMyAdmin
   phpmyadmin:
     image: phpmyadmin/phpmyadmin
     container_name: phpmyadmin-firstaid
     ports:
       - "8089:80"
-    networks:
-      - app-network
     environment:
-      PMA_HOSTS: mysql-participant,mysql-training
-      PMA_PORTS: 3306,3306
+      PMA_HOST: mysql
+      PMA_PORT: 3306
 
-  # Config Server
   config-service:
     build:
       context: ./config-service
@@ -56,8 +35,6 @@ services:
     container_name: config-service
     ports:
       - "9999:9999"
-    networks:
-      - app-network
     depends_on:
       discovery-service:
         condition: service_healthy
@@ -71,7 +48,6 @@ services:
       retries: 5
       start_period: 60s
 
-  # Service Discovery (Eureka)
   discovery-service:
     build:
       context: ./discovery-service
@@ -79,8 +55,6 @@ services:
     container_name: discovery-service
     ports:
       - "8761:8761"
-    networks:
-      - app-network
     healthcheck:
       test: [ "CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8761/actuator/health" ]
       interval: 30s
@@ -88,7 +62,6 @@ services:
       retries: 5
       start_period: 60s
 
-  # API Gateway
   gateway-service:
     build:
       context: ./gateway-service
@@ -96,17 +69,13 @@ services:
     container_name: gateway-service
     ports:
       - "8888:8888"
-    networks:
-      - app-network
     depends_on:
-      - discovery-service
+      discovery-service:
+        condition: service_healthy
     environment:
-      - SPRING_PROFILES_ACTIVE=dev
-      - SPRING_CONFIG_IMPORT=optional:configserver:http://config-service:9999
-      - SPRING_CLOUD_CONFIG_URI=http://config-service:9999
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://discovery-service:8761/eureka/
+      - KEYCLOAK_AUTH_SERVER_URL=http://localhost:8080
 
-  # Participant Service
   participant-service:
     build:
       context: ./participant-service
@@ -114,19 +83,20 @@ services:
     container_name: participant-service
     ports:
       - "8082:8082"
-    networks:
-      - app-network
     depends_on:
-      mysql-participant:
+      mysql:
         condition: service_healthy
       discovery-service:
         condition: service_healthy
     environment:
       - SPRING_PROFILES_ACTIVE=dev
-      - SPRING_CONFIG_IMPORT=optional:configserver:http://config-service:9999
-      - SPRING_CLOUD_CONFIG_URI=http://config-service:9999
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://discovery-service:8761/eureka/
-  # Training Service
+      - SPRING_DATASOURCE_URL=jdbc:mysql://mysql:3306/first_aid_participant_bd
+      - SPRING_DATASOURCE_USERNAME=user
+      - SPRING_DATASOURCE_PASSWORD=password
+      - SPRING_JPA_HIBERNATE_DDL_AUTO=update
+      - SPRING_JPA_PROPERTIES_HIBERNATE_DIALECT=org.hibernate.dialect.MySQL8Dialect
+
   training-service:
     build:
       context: ./training-service
@@ -134,22 +104,63 @@ services:
     container_name: training-service
     ports:
       - "8081:8081"
-    networks:
-      - app-network
     depends_on:
-      mysql-training:
+      mysql:
         condition: service_healthy
       discovery-service:
         condition: service_healthy
     environment:
       - SPRING_PROFILES_ACTIVE=dev
-      - SPRING_CONFIG_IMPORT=optional:configserver:http://config-service:9999
-      - SPRING_CLOUD_CONFIG_URI=http://config-service:9999
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://discovery-service:8761/eureka/
+      - SPRING_DATASOURCE_URL=jdbc:mysql://mysql:3306/first_aid_training_bd
+      - SPRING_DATASOURCE_USERNAME=user
+      - SPRING_DATASOURCE_PASSWORD=password
+      - SPRING_JPA_HIBERNATE_DDL_AUTO=update
+      - SPRING_JPA_PROPERTIES_HIBERNATE_DIALECT=org.hibernate.dialect.MySQL8Dialect
+
+  loki:
+    image: grafana/loki:main
+    command: [ '-config.file=/etc/loki/local-config.yaml' ]
+    ports:
+      - '3100:3100'
+
+  prometheus:
+    image: prom/prometheus:v2.46.0
+    container_name: prometheus
+    command:
+      - --enable-feature=exemplar-storage
+      - --config.file=/etc/prometheus/prometheus.yml
+    volumes:
+      - ./docker/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9090:9090"
+
+  tempo:
+    image: grafana/tempo:2.2.2
+    container_name: tempo
+    command: [ "-config.file=/etc/tempo.yaml" ]
+    volumes:
+      - ./docker/tempo/tempo.yml:/etc/tempo.yaml:ro
+      - ./data/tempo:/tmp/tempo
+    ports:
+      - "3110:3100"
+      - "9411:9411"
+
+  grafana:
+    image: grafana/grafana:10.1.0
+    container_name: grafana
+    volumes:
+      - ./docker/grafana:/etc/grafana/provisioning/datasources:ro
+    environment:
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+      - GF_AUTH_DISABLE_LOGIN_FORM=true
+    ports:
+      - "3000:3000"
+
 volumes:
-  mysql_participant_data:
-  mysql_training_data:
+  mysql_data:
 
 networks:
-  app-network:
+  default:
     driver: bridge
